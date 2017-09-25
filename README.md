@@ -1,6 +1,6 @@
 <!-- README.md is generated from README.Rmd. Please edit that file -->
-PSTR
-====
+PSTR (1.1.0)
+============
 
 The PSTR package implements the Panel Smooth Transition Regression (PSTR) modelling.
 
@@ -12,6 +12,23 @@ The wild bootstrap and cluster wild bootstrap tests are also implemented.
 
 Parallel computation (as an option) is implemented in some functions, especially the bootstrap tests. Therefore, the package suits tasks running many cores on super-computation servers.
 
+How to install
+--------------
+
+You can either install the stable version from CRAN
+
+``` r
+install.packages("PSTR")
+```
+
+or install the development version from GitHub
+
+``` r
+devtools::install_github("yukai-yang/PSTR")
+```
+
+provided that the package "devtools" has been installed beforehand.
+
 Example
 -------
 
@@ -21,12 +38,28 @@ After installing the package, you need to load (attach better say) it by running
 library(PSTR)
 ```
 
+You can first check the information and the current version number by running
+
+``` r
+version()
+#> #########################################################################
+#> ## package name: PSTR
+#> ## author: Yukai Yang
+#> ## Department of Statistics
+#> ## Uppsala University
+#> ## yukai.yang@statistik.uu.se
+#> ## Version 1.1.0 Sep. 2017
+#> #########################################################################
+```
+
 Then you can take a look at all the available functions and data in the package
 
 ``` r
 ls( grep("PSTR", search()) ) 
-#> [1] "EstPSTR"     "EvalTest"    "Hansen99"    "LinTest"     "NewPSTR"    
-#> [6] "version"     "WCB_HETest"  "WCB_LinTest" "WCB_TVTest"
+#>  [1] "EstPSTR"         "EvalTest"        "Hansen99"       
+#>  [4] "LinTest"         "NewPSTR"         "plot_transition"
+#>  [7] "version"         "WCB_HETest"      "WCB_LinTest"    
+#> [10] "WCB_TVTest"
 ```
 
 In the package, a data set called "Hansen99" is offered to give prompt example. For details of the data set, you can run
@@ -43,7 +76,7 @@ pstr = NewPSTR(Hansen99, dep='inva', indep=4:20, indep_k=c('vala','debta','cfa',
 print(pstr)
 #> #########################################################################
 #> ## package name: PSTR
-#> ## Version 1.0.1, Sep. 2017
+#> ## Version 1.1.0 Sep. 2017
 #> #########################################################################
 #> ***********************************************************************
 #> Summary of the model:
@@ -60,6 +93,17 @@ print(pstr)
 #> -----------------------------------------------------------------------
 #> Potential transition variable(s) to be tested:
 #>   vala
+#> #########################################################################
+#> ***********************************************************************
+#> Results of the linearity (homogeneity) tests:
+#> ***********************************************************************
+#> Sequence of homogeneity tests for selecting number of switches 'm':
+#> #########################################################################
+#> ***********************************************************************
+#> Results of the PSTR estimation:
+#> #########################################################################
+#> ***********************************************************************
+#> Results of the evaluation tests:
 #> ***********************************************************************
 #> #########################################################################
 ```
@@ -77,7 +121,7 @@ pstr = LinTest(use=pstr)
 print(pstr, "tests")
 #> #########################################################################
 #> ## package name: PSTR
-#> ## Version 1.0.1, Sep. 2017
+#> ## Version 1.1.0 Sep. 2017
 #> #########################################################################
 #> ***********************************************************************
 #> Results of the linearity (homogeneity) tests:
@@ -116,18 +160,18 @@ pstr = WCB_LinTest(use=pstr,iB=4,parallel=T,cpus=2)
 When you determine which transition variable to use for the estimation, in this case "inva", you can estimate the PSTR model
 
 ``` r
-pstr = EstPSTR(use=pstr,im=1,iq=1,par=c(1.6,.5), vLower=4, vUpper=4)
+pstr = EstPSTR(use=pstr,im=1,iq=1,useDelta=T,par=c(1.6,.5), vLower=4, vUpper=4)
 print(pstr,"estimates")
 ```
 
 By default, the "optim" method "L-BFGS-B" is used, but you can change the method for estimation by doing
 
 ``` r
-pstr = EstPSTR(use=pstr,im=1,iq=1,par=c(1.6,.5), method="CG")
+pstr = EstPSTR(use=pstr,im=1,iq=1,useDelta=T,par=c(1.6,.5), method="CG")
 print(pstr,"estimates")
 #> #########################################################################
 #> ## package name: PSTR
-#> ## Version 1.0.1, Sep. 2017
+#> ## Version 1.1.0 Sep. 2017
 #> #########################################################################
 #> ***********************************************************************
 #> Results of the PSTR estimation:
@@ -165,7 +209,54 @@ print(pstr,"estimates")
 #> #########################################################################
 ```
 
-Thus, the evaluation tests can be done based on the estimated model
+The argument "useDelta" determines the type of the initial value for the smoothness parameter. By default "useDelta = F" means that the first initial value in "par" is the "gamma" instead of "delta". Here we use the settings "useDelta = T" and "par = c(1.6, .5)" means that the first value of "par" is the "delta" and its value is 1.6. Note that "delta" and "gamma" has the relationship "gamma = exp(delta)". Thus, the following two sentences are equivalent
+
+``` r
+pstr = EstPSTR(use=pstr,im=1,iq=1,useDelta=T,par=c(1.6,.5), method="CG")
+pstr = EstPSTR(use=pstr,im=1,iq=1,par=c(exp(1.6),.5), method="CG")
+```
+
+For details, read the vignette.
+
+Now you can plot the estimated transition function by running
+
+``` r
+plot_transition(pstr, logx=TRUE, color = "blue", size = 2,
+    x="Tobin's Q in log scale", title="The Estimated Transition Function",
+    caption="If you wanna write something in the caption, do it here.")
+```
+
+Note that the estimation of a linear panel regression model is also implemented. The user can do it by simply running
+
+``` r
+pstr0 = EstPSTR(use=pstr)
+print(pstr0,"estimates")
+#> #########################################################################
+#> ## package name: PSTR
+#> ## Version 1.1.0 Sep. 2017
+#> #########################################################################
+#> ***********************************************************************
+#> Results of the PSTR estimation:
+#> -----------------------------------------------------------------------
+#> A linear panel regression with fixed effects is estimated.
+#> -----------------------------------------------------------------------
+#> Parameter estimates are
+#>          dt_75     dt_76     dt_77    dt_78    dt_79    dt_80    dt_81
+#> Est  -0.007759 -0.008248 -0.004296 0.002356 0.004370 0.008246 0.004164
+#> s.e.  0.002306  0.002544  0.002718 0.002820 0.002753 0.002959 0.002992
+#>          dt_82     dt_83    dt_84    dt_85    dt_86     dt_87     vala
+#> Est  -0.005294 -0.010040 0.006864 0.009740 0.007027 0.0004091 0.008334
+#> s.e.  0.002664  0.002678 0.003092 0.003207 0.003069 0.0030080 0.001259
+#>          debta     cfa    sales
+#> Est  -0.016380 0.06506 0.007957
+#> s.e.  0.005725 0.01079 0.002412
+#> -----------------------------------------------------------------------
+#> Estimated standard deviation of the residuals is 0.04375
+#> ***********************************************************************
+#> #########################################################################
+```
+
+The evaluation tests can be done based on the estimated model
 
 ``` r
 ## evaluatio tests
@@ -186,3 +277,5 @@ pstr = WCB_TVTest(use=pstr,iB=iB,parallel=T,cpus=cpus)
 ## wild bootstrap heterogeneity evaluation test
 pstr1 = WCB_HETest(use=pstr1,vq=pstr$mQ[,1],iB=iB,parallel=T,cpus=cpus)
 ```
+
+Note that the evaluation functions do not accept the returned object "pstr0" from a linear panel regression model, as the evaluation tests are designed for the estimated PSTR model but not a linear one.
