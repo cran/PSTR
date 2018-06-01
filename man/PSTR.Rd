@@ -23,6 +23,10 @@ Therefore, the package suits tasks running many cores on super-computation serve
 The Panel Smooth Transition Regression (PSTR) model is defined to be
 \deqn{y_{it} = \mu_i + \beta_0' x_{it} + \beta_1' z_{it} g_{it} + u_{it}}
 where \eqn{g_{it}} is the transition function taking the logistic form with the transition variable for individual \eqn{i}, \eqn{x_{it}} contains the explanatory variables in the linear part, and \eqn{z_{it}} contains the explanatory variables in the nonlinear part, and they can be different.
+
+The transition function \eqn{g_{it}} takes the logistic form
+\deqn{g(q_{it} ; \gamma, c) = \left( 1 + \exp \left( - \gamma \prod_{j=1}^{m} (q_{it} - c_j) \right) \right)^{-1}}
+with \eqn{\gamma > 0} and \eqn{c_1 < c_2 < ... < c_m}. \eqn{\gamma} can be reparametrized as \eqn{\gamma = \exp{\delta}} where \eqn{\delta} is a real number.
 }
 \section{Author and Maintainer}{
 
@@ -35,7 +39,7 @@ Department of Statistics, Uppsala University
 
 \section{References}{
 
-González, A., Teräsvirta, T., van Dijk, D. and Yang, Y. (2017) \emph{Panel Smooth Transition Regression Models}
+González, A., Teräsvirta, T., van Dijk, D. and Yang, Y. (2005) "\href{http://swopec.hhs.se/hastef/papers/hastef0604.pdf}{Panel Smooth Transition Regression Models}", SSE/EFI Working Paper Series in Economics and Finance 604, Stockholm School of Economics, revised 11 Oct 2017.
 }
 
 \section{Function for Initialization}{
@@ -71,10 +75,14 @@ González, A., Teräsvirta, T., van Dijk, D. and Yang, Y. (2017) \emph{Panel Smo
 \code{\link{print.PSTR}} prints the object of the class PSTR.
 
 \code{\link{plot_transition}} plots the transition function of an estimated PSTR model.
+
+\code{\link{plot_response}} plots curve or surfaces of the expected reponse agaist the corresponding variable.
 }
 
 \section{Data}{
 
 \code{\link{Hansen99}} a balanced panel of 565 US firms observed for the years 1973–1987.
+
+\code{\link{sunspot}} transformed Wolf annual sunspot numbers for the years 1710-1979.
 }
 
