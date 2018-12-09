@@ -92,8 +92,8 @@ Der2GFunc <- function(vg,vs,vp)
 #' @param use an object of the class PSTR, created by \code{\link{NewPSTR}} function.
 #' @param im specifies the number of switches in the transtion function. The default value is 1.
 #' @param iq a column number (in \code{mQ}) or variable name specifying the transition variable to use.
-#' @param par initial values for the parameters \eqn{\gamma} or \eqn{\delta}, and \eqn{c} to be optimized over. It is a vector of length \code{im}+1, where \code{im} is the number of switches. when missing, the function will choose the initial values automatically.
-#' @param useDelta whether delta is used in par in the estimation.
+#' @param par initial values for the parameters \eqn{\gamma} or \eqn{\delta}, and \eqn{c} to be optimized over. It is a vector of length \code{im}+1, where \code{im} is the number of switches. When missing, the function will choose the initial values automatically, and \code{useDelta=TRUE}.
+#' @param useDelta whether delta is used in par in the estimation. Note that if \code{par} is missing, this argument will be ignored.
 #' @param vLower a vector or number of the lower offsets determining the lower bounds of the parameters. The lower bounds of the parameters are \code{par - vLower}.
 #' @param vUpper a vector or number of the upper offsets determining the upper bounds of the parameters. The upper bounds of the parameters are \code{par + vUpper}.
 #' @param method the method to be used in optimization. See the function \code{stats::optim}.
@@ -160,10 +160,14 @@ EstPSTR <- function(use, im=1, iq=NULL, par=NULL, useDelta=FALSE, vLower=2, vUpp
   ftmp <- function(vx) return(vx - mean(vx))
   
   ret$imm = im # used in estimation
+  
   ret$iq=iq
   
   if(!is.null(iq)){ 
     if(im < 1) stop(simpleError("The number of switches is invalid."))
+    
+    if(!is.numeric(iq)) ret$iq=which(use$mQ_name==iq) 
+    if(length(ret$iq)>1) stop(simpleError("Sorry! We only support the one transition variable case."))
     
     vQ = use$mQ[,iq]
     mQ = t(matrix(vQ,iT*iN,im))  

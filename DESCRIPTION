@@ -1,7 +1,7 @@
 Package: PSTR
 Type: Package
 Title: Panel Smooth Transition Regression Modelling
-Version: 1.2.1
+Version: 1.2.3
 Authors@R: person("Yukai", "Yang", email = "yukai.yang@statistik.uu.se",role = c("aut", "cre"))
 Description: Provides the Panel Smooth Transition Regression (PSTR) modelling.
     The modelling procedure consists of three stages: Specification, Estimation and Evaluation.
@@ -15,14 +15,15 @@ Depends: R (>= 3.0.0)
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 6.0.1
+RoxygenNote: 6.1.1
 Imports: tibble, snowfall, ggplot2, plotly, stats, magrittr
 Suggests: knitr, rmarkdown
 URL: https://github.com/yukai-yang/PSTR
 BugReports: https://github.com/yukai-yang/PSTR/issues
+VignetteBuilder: knitr
 NeedsCompilation: no
-Packaged: 2018-05-31 23:58:53 UTC; yyang
+Packaged: 2018-12-09 17:34:45 UTC; yyang
 Author: Yukai Yang [aut, cre]
 Maintainer: Yukai Yang <yukai.yang@statistik.uu.se>
 Repository: CRAN
-Date/Publication: 2018-06-01 12:30:40 UTC
+Date/Publication: 2018-12-09 18:00:03 UTC

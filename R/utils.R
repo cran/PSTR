@@ -9,8 +9,7 @@
 ## utility functions
 #################################################################################
 
-vnum = "1.2.1"
-location = "CRAN"
+vnum = "1.2.3"
 
 # simple cat
 cat0 <- function(...)
@@ -30,7 +29,7 @@ cat0 <- function(...)
 #'
 #' @export
 version <- function(){
-  cat0("PSTR version ", vnum, " (Orange Panel) from ",location)
+  cat0("PSTR version ", vnum, " (Orange Panel)")
 }
 
 
@@ -58,7 +57,7 @@ version <- function(){
 print.PSTR <- function(x, mode=c("su","e"), digits=4, ...)
 {
   cat0(paste0(rep("#",getOption("width")),collapse=''))
-  cat0("## PSTR ", vnum, " 'Orange Panel' from ",location)
+  cat0("## PSTR ", vnum, " 'Orange Panel'")
 
   tmp = NULL
   for(iter in 1:length(mode)){
@@ -482,4 +481,121 @@ plot_response <- function(obj, vars, log_scale=FALSE, length.out=20)
   }
 
   return(ret)
+}
+
+
+
+#' Plot the surface of the target function for the nonlinear least square estimation.
+#'
+#' This function plots the surface of the target function for the nonlinear least square estimation.
+#' It is useful for finding the suitable initial value for the estimation.
+#'
+#' The funciton uses the \code{plotly} package to plot the 3-D surface of the target function for the nonlinear least square estimation.
+#'
+#' The function takes the PSTR object as one of the inputs. The user needs to give the number of switches \code{im}, and the transition variable \code{iq},
+#' such that the target function values can be computed.
+#'
+#' The number of parameters to estimate in the nonlinear least square estimation is \code{1+im}, that is, one smoothness parameter and the \code{im} switching locations.
+#' However, the 3-D plot is based on only two changing parameters with the others (if more than two parameters) constant. Thus, the user needs to input a vector \code{par},
+#' which gives the values of the other parameters. Note that \code{par} should still be of length \code{1+im} with the order \eqn{\delta} (always use delta in this function),
+#' \eqn{c_1}, ..., \eqn{c_m}.
+#'
+#' The user should give the vector \code{basedon} of length two, that shows which two parameters will be used to build the grid.
+#' \code{basedon} gives the positions of the two parameters in \code{par}. Thus, the values in the positions \code{basedon} in \code{par} will not be used.
+#'
+#' \code{from}, \code{to} and \code{length.out} serve to build the grid for the two parameters.
+#' These arguments must be of length two for the two parameters, respectively.
+#' See the \code{seq} function for the details.
+#'
+#'
+#' @param obj an object of the class PSTR returned from some functions in the package.
+#' @param im specifies the number of switches in the transtion function. The default value is 1.
+#' @param iq a column number (in \code{mQ}) or variable name specifying the transition variable to use.
+#' @param par a vector of the values of the parameters. NULL by default, then it will be made automatically.
+#' @param basedon an integer vector of length 2 specify which two parameters to use to build the grid.
+#' @param from a vector of length 2 of the starting (minimal) values of the parameters.
+#' @param to a vector of length 2 of the end (maximal) values of the parameters.
+#' @param length.out a 2-dim vector or scalar of desired length (number of points) for the parameters. 40 by default.
+#'
+#' @return A plottable object from the \code{plotly} package.
+#'
+#' @author Yukai Yang, \email{yukai.yang@@statistik.uu.se}
+#' @seealso Functions which return an object of the class PSTR and can be input into this function
+#'
+#' \code{\link{NewPSTR}}, \code{\link{LinTest}}, \code{\link{WCB_LinTest}}, \code{\link{EstPSTR}}, \code{\link{EvalTest}}, \code{\link{WCB_TVTest}} and \code{\link{WCB_HETest}}
+#'
+#' @keywords utils
+#'
+#' @examples
+#' \donttest{
+#' pstr = NewPSTR(Hansen99, dep='inva', indep=4:20, indep_k=c('vala','debta','cfa','sales'),
+#'     tvars=c('vala'), iT=14) # create a new PSTR object
+#'
+#' # build the grid based on the first two parameters
+#' ret = plot_target(obj=pstr,iq=1,basedon=c(1,2),from=c(log(1),6),
+#'   to=c(log(18),10),length.out=c(40,40))
+#' }
+#' 
+#' @export
+plot_target <- function(obj,im=1,iq=NULL,par=NULL,basedon=c(1,2),from,to,length.out=40)
+{
+  if(class(obj)!="PSTR")
+    stop(simpleError("The argument 'obj' is not an object of class 'PSTR'"))
+  ret = NULL
+  iT = obj$iT; iN = obj$iN
+
+  # get the data here
+  vY = obj$vY; vYb = obj$vYb
+  mX = obj$mX; mXb = obj$mXb
+  mK = obj$mK
+  ik = ncol(mK)
+
+  ftmp <- function(vx) return(vx - mean(vx))
+
+  if(!is.null(iq)){
+    if(im < 1) stop(simpleError("The number of switches is invalid."))
+
+    pnames = paste0('c_',basedon-1)
+    pnames[pnames=='c_0'] = "delta"
+
+    vQ = obj$mQ[,iq]
+    mQ = t(matrix(vQ,iT*iN,im))
+
+    if(is.null(par)){
+      tmp = unname(quantile(vQ, (1:im) / (im+1)))
+      par = c(log(8/min(diff(c(0,tmp)))), tmp)
+    }
+
+    if(length(length.out)==1) length.out = rep(length.out,2)
+
+    ret$x = seq(from=from[1], to=to[1], length.out=length.out[1])
+    ret$y = seq(from=from[2], to=to[2], length.out=length.out[2])
+
+    ret$com = expand.grid(ret$x, ret$y)
+
+    ResiduleSumSquare <- function(vpp){
+      vp = par
+      vp[basedon] = vpp
+      vg = fTF(vx=mQ,gamma=exp(vp[1]),vc=vp[2:length(vp)])
+      mXX = mK * vg
+      aXX = array(c(mXX), dim=c(iT,iN,ik))
+      mXXb = cbind(mXb, matrix(c(apply(aXX,c(2,3),ftmp)), iT*iN, ik))
+      tmp = chol2inv(chol(t(mXXb)%*%mXXb)) %*% t(mXXb) %*% vYb
+      vE = c(vYb-mXXb%*%tmp)
+      return(sum(vE*vE)/iT/iN)
+    }
+
+    ret$val = apply(ret$com,1,ResiduleSumSquare)
+    ret$val = t(matrix(ret$val, nrow=length(ret$x)))
+
+    ret = add_surface(plot_ly(x=ret$x, y=ret$y, z=ret$val))
+
+    tmpp = list(xaxis=list(title=pnames[1]),
+                yaxis=list(title=pnames[2]),zaxis=list(title="target"))
+    ret = ret %>% layout(scene=tmpp)
+
+    return(ret)
+  }
+  else stop(simpleError("Transition variable missing! Please specify iq."))
+
 }

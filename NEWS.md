@@ -1,4 +1,14 @@
 <!-- README.md is generated from README.Rmd. Please edit that file -->
+New Features in PSTR 1.2.3 'Orange Panel'
+=========================================
+
+-   fix some bugs found in the previous version.
+
+New Features in PSTR 1.2.2 'Orange Panel'
+=========================================
+
+-   fix some bugs found in the previous version.
+
 New Features in PSTR 1.2.1 'Orange Panel'
 =========================================
 
