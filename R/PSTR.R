@@ -88,7 +88,7 @@ NULL
 #' @import tibble
 NULL
 
-#' @importFrom ggplot2 ggplot aes geom_point geom_line labs scale_x_log10
+#' @importFrom ggplot2 ggplot aes geom_point geom_rug geom_rect geom_line geom_hline facet_grid vars labs scale_x_log10 xlim ylim
 NULL
 
 #' @importFrom plotly add_surface add_trace plot_ly layout
@@ -142,8 +142,8 @@ NULL
 #' @export
 NewPSTR <- function(data, dep, indep, indep_k=NULL, tvars, im=1, iT)
 {
-  ret = list(); class(ret) = "PSTR"
   if(!is_tibble(data)) stop(simpleError("data should be a tibble!"))
+  ret = list(); class(ret) = "PSTR"
 
   ret$iT = iT
   iNN = dim(data)[1]/iT

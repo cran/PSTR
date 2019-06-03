@@ -40,21 +40,16 @@ print(pstr, "tests")
 #  pstr = WCB_LinTest(use=pstr,iB=4,parallel=T,cpus=2)
 
 ## ----estimate, eval=F----------------------------------------------------
-#  pstr = EstPSTR(use=pstr,im=1,iq=1,useDelta=T,par=c(1.6,.5), vLower=4, vUpper=4)
+#  pstr = EstPSTR(use=pstr,im=1,iq=1,useDelta=T,par=c(-0.462,0), vLower=4, vUpper=4)
 #  print(pstr,"estimates")
 
 ## ----estimate1-----------------------------------------------------------
-pstr = EstPSTR(use=pstr,im=1,iq=1,useDelta=T,par=c(1.6,.5), method="CG")
+pstr = EstPSTR(use=pstr,im=1,iq=1,useDelta=T,par=c(-0.462,0), method="CG")
 print(pstr,"estimates")
 
 ## ----estimate2, eval=F---------------------------------------------------
-#  pstr = EstPSTR(use=pstr,im=1,iq=1,useDelta=T,par=c(1.6,.5), method="CG")
-#  pstr = EstPSTR(use=pstr,im=1,iq=1,par=c(exp(1.6),.5), method="CG")
-
-## ----plot----------------------------------------------------------------
-plot_transition(pstr, log_scale=TRUE, color = "blue", size = 2,
-    x="Tobin's Q in log scale", title="The Estimated Transition Function",
-    caption="If you wanna write something in the caption, do it here.")
+#  pstr = EstPSTR(use=pstr,im=1,iq=1,useDelta=T,par=c(-0.462,0), method="CG")
+#  pstr = EstPSTR(use=pstr,im=1,iq=1,par=c(exp(-0.462),0), method="CG")
 
 ## ----estimate3-----------------------------------------------------------
 pstr0 = EstPSTR(use=pstr)
@@ -73,6 +68,19 @@ print(pstr0,"estimates")
 #  
 #  ## wild bootstrap heterogeneity evaluation test
 #  pstr1 = WCB_HETest(use=pstr1,vq=pstr$mQ[,1],iB=iB,parallel=T,cpus=cpus)
+
+## ----plot_trans1---------------------------------------------------------
+plot_transition(pstr)
+
+## ----plot_trans2---------------------------------------------------------
+plot_transition(pstr, fill='blue', xlim=c(-2,20), color = "dodgerblue4", size = 2, alpha=.3) +
+  ggplot2::geom_vline(ggplot2::aes(xintercept = pstr$c - log(1/0.95 - 1)/pstr$gamma),color='blue') +
+  ggplot2::labs(x="customize the label for x axis",y="customize the label for y axis",
+       title="The Title",subtitle="The subtitle",caption="Make a caption here.")
+
+## ----plot_coef-----------------------------------------------------------
+ret = plot_coefficients(pstr, vars=1:4, length.out=100, color="dodgerblue4", size=2)
+ret[[1]]
 
 ## ----plot0---------------------------------------------------------------
 ret = plot_response(obj=pstr, vars=1:4, log_scale = c(F,T), length.out=100)
