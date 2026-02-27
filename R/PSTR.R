@@ -2,7 +2,6 @@
 ## package name: PSTR
 ## author: Yukai Yang
 ## Statistiska Inst., Uppsala Universitet
-## Nov 2018
 #################################################################################
 
 
@@ -64,6 +63,8 @@
 #' \code{\link{print.PSTR}} prints the object of the class PSTR.
 #'
 #' \code{\link{plot_transition}} plots the transition function of an estimated PSTR model.
+#' 
+#' \code{\link{plot_coefficients}} plots coefficients, standard errors, and p-values against the transition variable.
 #'
 #' \code{\link{plot_response}} plots curve or surfaces of the expected reponse agaist the corresponding variable.
 #'
@@ -74,12 +75,20 @@
 #'
 #' \code{\link{sunspot}} transformed Wolf annual sunspot numbers for the years 1710-1979.
 #'
-#' @docType package
-#' @name PSTR
-NULL
+#' @keywords internal
+"_PACKAGE"
 
 
 #' @importFrom stats optim pchisq pf quantile
+NULL
+
+#' @importFrom R6 R6Class
+NULL
+
+#' @importFrom knitr kable
+NULL
+
+#' @importFrom cli cli_alert_success cli_h1 cli_h2 cli_h3 cli_alert_info cli_alert_warning cli_alert_danger
 NULL
 
 #' @importFrom magrittr %>%
@@ -94,96 +103,151 @@ NULL
 #' @importFrom plotly add_surface add_trace plot_ly layout
 NULL
 
-#' @importFrom snowfall sfInit sfExport sfSapply sfStop
-NULL
 
-
-#' Create an object of the class PSTR.
+#' Create a PSTR model object
 #'
-#' Create an object of the S3 class PSTR for later usage. This function should be run prior to the other functions in the package. It will return an object which you will use as an input for the other functions. It builds up the basic settings for the Panel Smooth Transition Regression (PSTR) Modelling.
+#' Create an R6 object of class \code{"PSTR"} to be used as the main container for
+#' Panel Smooth Transition Regression (PSTR) modelling in this package.
+#' You typically call \code{NewPSTR()} once, and then pass the returned object to
+#' specification, estimation and evaluation functions.
 #'
-#' Potential transition variables in \code{tvars} will be tested one by one in, for example, \code{LinTest} function.
+#' The candidate transition variables in \code{tvars} will be stored in the object
+#' and can be tested one by one by functions such as \code{\link{LinTest}}.
 #'
-#' There is no need to specify the number of individuals,  as it will be obtained automatically inside the function given the number of rows and the sample size \code{iT}.
+#' Missing values in the dependent variable, linear regressors, non-linear regressors,
+#' or transition variables are removed internally (row-wise).
+#' The number of individuals \eqn{N} is inferred from \code{nrow(data)} and \code{iT}
+#' after removing missing values.
 #'
-#' \code{NA}s in \code{data} are removed automatically inside the function.
+#' @param data A tibble containing the panel in long format. The number of rows must be
+#'   \code{iT * N} for some integer \code{N}. Rows are assumed to be ordered by time within
+#'   individual, consistently with the package conventions.
+#' @param dep A single column index or a single column name specifying the dependent variable.
+#' @param indep A vector of column indices or column names specifying the regressors in the
+#'   linear part.
+#' @param indep_k Optional. A vector of column indices or column names specifying the regressors
+#'   in the non-linear part. If \code{NULL}, the non-linear part is set equal to the linear part.
+#' @param tvars A vector of column indices or column names specifying the candidate transition
+#'   variables.
+#' @param im Integer. The maximal number of switches used in linearity-related tests.
+#'   Default is \code{1}.
+#' @param iT Integer. The time dimension (number of time observations per individual).
 #'
-#' @param data a tibble of data. The number of rows of \code{data} must be the sample size \code{iT} times individuals number N.
-#' @param dep column number or name of the dependent variable. Note that this must be specified.
-#' @param indep a vector of column numbers of names of the independent variables. Note that this must be specified.
-#' @param indep_k a vector of column numbers of names of the independent variables in the nonlinear part. If \code{indep_k} is not given (\code{= NULL}), the nonlinear part will be the same as the linear part.
-#' @param tvars a vector of column numbers or names of the potential transition variables to be tested.
-#' @param im maximal number of switches in the transition function used in the linearity evaluation tests, by default \code{im=1}.
-#' @param iT sample size.
+#' @return An R6 object of class \code{"PSTR"}.
 #'
-#' @return An object of the class PSTR for later usage.
+#' @seealso \code{\link{LinTest}}, \code{\link{WCB_LinTest}}, \code{\link{EstPSTR}},
+#'   \code{\link{EvalTest}}, \code{\link{WCB_TVTest}}, \code{\link{WCB_HETest}}.
 #'
-#' The object is a list containing the following components:
-#' \item{iT}{the time length of the panel}
-#' \item{iN}{the number of individuals}
-#' \item{vY}{the vector of the dependent variable}
-#' \item{mX}{the matrix of the explanatory variables in the linear part}
-#' \item{mK}{the matrix of the explanatory variables in the nonlinear part}
-#' \item{mQ}{the matrix of the potential transition variables}
-#' \item{im}{the maximal number of switches used in the linearity test}
-#'
-#' @author Yukai Yang, \email{yukai.yang@@statistik.uu.se}
-#' @seealso \code{\link{LinTest}}
 #' @keywords initialization
 #'
 #' @examples
-#' pstr = NewPSTR(Hansen99, dep='inva', indep=4:20, indep_k=c('vala','debta','cfa','sales'),
-#'     tvars=c('vala','debta'), iT=14)
+#' \donttest{
+#' pstr <- NewPSTR(
+#'   Hansen99,
+#'   dep = "inva",
+#'   indep = 4:20,
+#'   indep_k = c("vala", "debta", "cfa", "sales"),
+#'   tvars = c("vala", "debta"),
+#'   iT = 14
+#' )
 #'
+#' # print summary (your R6 print method)
 #' pstr
+#' print(pstr, mode = "summary")
 #'
-#' print(pstr,"summary")
+#' # after running tests/estimation, you can print other sections
+#' # print(pstr, mode = "tests")
+#' # print(pstr, mode = "estimates")
+#' # print(pstr, mode = "evaluation")
+#' }
 #'
 #' @export
 NewPSTR <- function(data, dep, indep, indep_k=NULL, tvars, im=1, iT)
 {
-  if(!is_tibble(data)) stop(simpleError("data should be a tibble!"))
-  ret = list(); class(ret) = "PSTR"
-
-  ret$iT = iT
-  iNN = dim(data)[1]/iT
-  coln = c(t(matrix(1:iNN, iNN, iT)))
+  # checking
+  if(!is_tibble(data)){cli::cli_alert_danger("data should be a tibble!"); return(0)}
+  if(length(dep)>1){cli::cli_alert_danger("Only one dependent variable!"); return(0)}
+  if(length(indep)<1){cli::cli_alert_danger("There is no independent variable!"); return(0)}
+  if(length(tvars)<1){cli::cli_alert_danger("Please specify the candidates of the transition variables 'tvars'."); return(0)}
   
-  if(length(dep)>1) stop(simpleError("Only one dependent variable!"))
-  vY = data[,dep]; ret$vY_name =  names(data[,dep])
-  
-  if(length(indep)<1) stop(simpleError("There is no independent variable!"))
-  mX = data[,indep]; ret$mX_name = names(data[,indep])
-  
-  if(is.null(indep_k)){
-    mK = mX; ret$mK_name = ret$mX_name
-  }else{
-    mK = data[,indep_k]; ret$mK_name = names(data[,indep_k])
-  }
-  
-  if(length(tvars)<1) stop(simpleError("Please specify the candidates of the transition variables 'tvars'."))
-  mQ = data[,tvars]; ret$mQ_name = names(data[,tvars])
-
-  ## remove the NAs
-  tmp = is.na(vY) | apply(is.na(mX), 1, any) | apply(is.na(mK), 1, any) | apply(is.na(mQ), 1, any)
-  tmp = is.na(match(coln,coln[tmp]))
-  vY = vY[tmp,]; mX = mX[tmp,]; mK = mK[tmp,]; mQ = mQ[tmp,]
-  ret$vY = c(as.matrix(vY))
-  ret$mX = as.matrix(mX)
-  ret$mK = as.matrix(mK)
-  ret$mQ = as.matrix(mQ)
-  ret$im = im
-
-  iN = sum(tmp)/iT; ret$iN = iN
-
-  coln = c(t(matrix(1:iN, iN, iT)))
-  vYb = NULL; mXb = NULL
-  for(nter in 1:iN){
-    tmp = coln==nter
-    vYb = c(vYb, ret$vY[tmp] - mean(ret$vY[tmp]))
-    mXb = rbind(mXb, t(t(mX[tmp,])-apply(t(mX[tmp,]),1,mean)))
-  }
-  ret$vYb = vYb; ret$mXb = mXb
-
+  #data, dep, indep, indep_k, tvars, im, iT
+  ret = PSTR$new(data=data, dep=dep, indep=indep, indep_k=indep_k, tvars=tvars, im=im, iT=iT)
+  cli::cli_alert_success("The PSTR model is ready.")
   return(ret)
 }
+
+
+# make the PSTR R6 class
+PSTR <- R6::R6Class(
+  "PSTR",
+  public = list(
+    initialize = function(data, dep, indep, indep_k, tvars, im, iT) {
+      private$iT = iT
+      
+      iNN = nrow(data)/iT; coln = c(t(matrix(1:iNN, iNN, iT)))
+      
+      vY = data[,dep]; private$vY_name =  names(data[,dep])
+      mX = data[,indep]; private$mX_name = names(data[,indep])
+      
+      if(is.null(indep_k)){
+        mK = mX; private$mK_name = private$mX_name
+      }else{
+        mK = data[,indep_k]; private$mK_name = names(data[,indep_k])
+      }
+      
+      mQ = data[,tvars]; private$mQ_name = names(data[,tvars])
+      
+      # remove the NAs
+      tmp = is.na(vY) | apply(is.na(mX), 1, any) | apply(is.na(mK), 1, any) | apply(is.na(mQ), 1, any)
+      tmp = is.na(match(coln,coln[tmp]))
+      vY = vY[tmp,]; mX = mX[tmp,]; mK = mK[tmp,]; mQ = mQ[tmp,]
+      private$vY = c(as.matrix(vY))
+      private$mX = as.matrix(mX)
+      private$mK = as.matrix(mK)
+      private$mQ = as.matrix(mQ)
+      private$im = im
+      
+      iN = sum(tmp)/iT; private$iN = iN
+      
+      coln = c(t(matrix(1:iN, iN, iT)))
+      vYb = NULL; mXb = NULL
+      for(nter in 1:iN){
+        tmp = coln==nter
+        vYb = c(vYb, private$vY[tmp] - mean(private$vY[tmp]))
+        mXb = rbind(mXb, t(t(mX[tmp,])-apply(t(mX[tmp,]),1,mean)))
+      }
+      
+      private$vYb = vYb; private$mXb = mXb
+    },
+    
+    # assigned by LinTest
+    test=NULL, sqtest=NULL,
+    # assigned by WCB_LinTest
+    wcb_test=NULL, wcb_sqtest=NULL,
+    
+    # estimation results
+    delta=NULL, gamma=NULL, c=NULL,
+    vg=NULL, beta=NULL,
+    vM=NULL, vU=NULL, s2=NULL,
+    cov=NULL, se=NULL, est=NULL,
+    mbeta=NULL, mse=NULL,
+    
+    # assigned by EvalTest
+    tv=NULL, ht=NULL,
+    
+    # assigned by WCB_TVTest
+    wcb_tv=NULL,
+    
+    # assigned by WCB_HETest
+    wcb_ht = NULL
+  ),
+  private = list(
+    iT=NULL, vY_name=NULL, mX_name=NULL, mK_name=NULL, mQ_name=NULL,
+    vY=NULL, mX=NULL, mK=NULL, mQ=NULL, im=NULL, iN=NULL,
+    vYb=NULL, mXb=NULL,
+    
+    # estimation results
+    imm=NULL, iq=NULL, par=NULL, convergence=NULL,
+    mXX=NULL
+  )
+)

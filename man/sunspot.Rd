@@ -4,7 +4,8 @@
 \name{sunspot}
 \alias{sunspot}
 \title{Transformed Wolf annual sunspot numbers for the years 1710-1979}
-\format{A tibble with 270 rows and 11 variables:
+\format{
+A tibble with 270 rows and 11 variables:
 \describe{
   \item{spot_0}{transformed sunspot}
   \item{spot_1}{transformed sunspot, lag one}
@@ -17,9 +18,10 @@
   \item{spot_8}{transformed sunspot, lag eight}
   \item{spot_9}{transformed sunspot, lag nine}
   \item{spot_10}{transformed sunspot, lag ten}
-}}
+}
+}
 \source{
-\url{http://sidc.oma.be/html/sunspot.html}
+\url{https://www.sidc.be/html/sunspot.html}
 }
 \usage{
 sunspot

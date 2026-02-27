@@ -2,34 +2,67 @@
 % Please edit documentation in R/utils.R
 \name{print.PSTR}
 \alias{print.PSTR}
-\title{Print the object of the class PSTR.}
-\usage{
-\method{print}{PSTR}(x, mode = c("su", "e"), digits = 4, ...)
-}
+\title{Print a PSTR model object}
 \arguments{
-\item{x}{an object of the class PSTR returned from some functions in the package. See below "See Also" for a list of these functions.}
+\item{x}{An object of class \code{"PSTR"}.}
 
-\item{mode}{a vector of character strings specifying which results to print. It takes the values c('summary', 'tests', 'estimates', 'evaluation'). By default 'su' and 'e' which means all.}
-
-\item{digits}{integer indicating the number of decimal places (for the \code{round} function inside) to be used. Negative values are allowed (see \code{round}).}
-
-\item{...}{further arguments passed to or from other methods. Ignored here.}
+\item{...}{Further arguments passed to the underlying print routine.
+See \strong{Arguments} below.}
+}
+\value{
+Invisibly returns \code{x}.
 }
 \description{
-This function prints the object of the class PSTR.
+Print method for objects of class \code{"PSTR"}.
 }
+\details{
+The print output is organised into four sections:
+\describe{
+  \item{\code{"summary"}}{Data summary: panel dimensions, dependent variable, linear/non-linear regressors, transition variables.}
+  \item{\code{"tests"}}{Specification tests: linearity (homogeneity) tests and the sequence of homogeneity tests (optionally with WB/WCB p-values if available).}
+  \item{\code{"estimates"}}{Estimation results: coefficient estimates with standard errors and t-ratios, printed in chunks to fit the console width.}
+  \item{\code{"evaluation"}}{Evaluation tests: parameter constancy and no-remaining-nonlinearity tests (optionally with WB/WCB p-values if available).}
+}
+
+In addition to calling \code{print(x, ...)}, the same functionality is available
+as an R6 method via \code{x$print(...)}.
+}
+\section{Arguments}{
+
+The following arguments are supported (they are forwarded to the R6 method \code{x$print()}):
+\describe{
+  \item{\code{format}}{Character. Output format passed to \code{knitr::kable()} (for example \code{"simple"}, \code{"pipe"}, \code{"latex"}). Default is \code{"simple"}.}
+  \item{\code{mode}}{Character vector specifying which sections to print. It is matched (partially) against \code{c("summary","tests","estimates","evaluation")}. Default is \code{"summary"}.}
+  \item{\code{digits}}{Integer. Number of significant digits used in printed tables. Default is \code{4}.}
+}
+}
+
 \examples{
-pstr = NewPSTR(Hansen99, dep='inva', indep=4:20, indep_k=c('vala','debta','cfa','sales'),
-    tvars=c('vala','debta','cfa','sales'), iT=14)
-print(pstr)
-print(pstr, mode='summary',digits=2)
+\donttest{
+pstr <- NewPSTR(Hansen99, dep = "inva", indep = 4:20,
+               indep_k = c("vala","debta","cfa","sales"),
+               tvars = c("vala","debta","cfa","sales"), iT = 14)
+
+# default: summary only
+pstr
+
+# specification tests
+print(pstr, mode = "tests", format = "simple")
+print(pstr, mode = "tests", format = "pipe", caption = "The test results")
+
+# estimates
+print(pstr, mode = "estimates")
+
+# evaluation
+print(pstr, mode = "evaluation")
+
+# R6 method interface (same output)
+pstr$print(mode = c("summary","tests"))
+}
+
 }
 \seealso{
-Functions which return an object of the class PSTR:
-
-\code{\link{NewPSTR}}, \code{\link{LinTest}}, \code{\link{WCB_LinTest}}, \code{\link{EstPSTR}}, \code{\link{EvalTest}}, \code{\link{WCB_TVTest}} and \code{\link{WCB_HETest}}
+\code{\link{NewPSTR}}, \code{\link{LinTest}}, \code{\link{WCB_LinTest}},
+  \code{\link{EstPSTR}}, \code{\link{EvalTest}}, \code{\link{WCB_TVTest}},
+  \code{\link{WCB_HETest}}.
 }
-\author{
-Yukai Yang, \email{yukai.yang@statistik.uu.se}
-}
-\keyword{utils}

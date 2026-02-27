@@ -2,278 +2,440 @@
 ## package name: PSTR
 ## author: Yukai Yang
 ## Statistiska Inst., Uppsala Universitet
-## Sep 2017
 #################################################################################
 
 
-#' Conduct the evaluation tests.
+#' Evaluate an estimated PSTR model
 #'
-#' These functions conduct the evaluation tests against two alternatives: 1. the parameters are time-varying and 2. there is remaining nonlinearity (remaining heterogeneity).
-#'
-#' \code{EvalTest} implements the evaluation tests.
-#'
-#' \code{WCB_TVTest} implements the wild bootstrap (WB) and the wild cluster bootstrap (WCB) evaluation test of no time-varying parameters.
-#'
-#' \code{WCB_HETest} implements the wild bootstrap (WB) and the wild cluster bootstrap (WCB) evaluation test of no remaining nonlinearity (no remaining heterogeneity).
-#'
-#' The functions need the return value (an object of the class PSTR) from the \code{\link{EstPSTR}}. Note that the PSTR model should be estimated before conducting the evaluation tests. They copy the object, reuse its contents, especially the estimates, to produce the evaluation test results, and then return a new object of the class PSTR. The user can choose to save the return value to a new object or simply to overwrite the object returned from \code{\link{EstPSTR}}. See the example below.
-#'
-#' The functions conduct two kinds of evaluation tests.
-#' The first kind of tests does the time-varying evaluation tests.
-#' The second kind of tests does the no remaining nonlinearity (no remaining heterogeneity) evaluation tests based on the vector of a new transition variable that the user input in the arguments.
-#'
-#' The results of the evaluation tests include four kinds of tests
-#' \itemize{
-#'   \item \eqn{\chi^2}-version LM test: the LM test with asymptotically \eqn{\chi^2} distribution under the null hypothesis.
-#'   \item F-version LM test: the LM test with asymptotically \eqn{F} distribution under the null hypothesis. The finite sample actual size is supposed to be improved.
-#'   \item \eqn{\chi^2}-version HAC test: the HAC LM test with asymptotically \eqn{\chi^2} distribution under the null hypothesis, which is heteroskedasticity and autocorrelation consistent.
-#'   \item F-version HAC test: the HAC LM test with asymptotically \eqn{F} distribution under the null hypothesis, which is heteroskedasticity and autocorrelation consistent. The finite sample actual size is supposed to be improved.
+#' \code{EvalTest} provides post-estimation evaluation tests for an estimated PSTR model.
+#' It supports two null hypotheses:
+#' \describe{
+#'   \item{Parameter constancy}{No time variation in parameters (labelled \code{"time-varying"}).}
+#'   \item{No remaining nonlinearity}{No remaining nonlinearity/heterogeneity given a candidate transition variable (labelled \code{"heterogeneity"}).}
 #' }
 #'
-#' The wild bootstrap (WB) evaluation tests are heteroskedasticity robust, while the wild cluster bootstrap (WCB) ones are both cluster-dependency and heteroskedasticity robust. Cluster-dependency implies that there can be dependency (autocorrelation) within individual, but no correlation across individuals. The WB and WCB tests may take quite a long time to run which depends on the model specification and the number of repetitions \code{iB}. It is strongly recommended to use super-computation server with many cores to run the code instead of a personal computer. The user may first try a small number of repetitions \code{iB} and estimate the time consumed for a larger number of \code{iB}.
+#' Wild bootstrap (WB) and wild cluster bootstrap (WCB) versions are available via
+#' \code{WCB_TVTest} (parameter constancy) and \code{WCB_HETest} (no remaining nonlinearity).
 #'
-#' The functions never change the existing values in the input PSTR object. They add more values (attributes) into the input object and return.
+#' Two equivalent interfaces are available for each test:
+#' \enumerate{
+#'   \item Wrapper function, for example \code{EvalTest(use = obj, ...)}.
+#'   \item R6 method, for example \code{obj$EvalTest(...)}.
+#' }
+#' Each wrapper calls the corresponding R6 method and returns \code{use} invisibly.
 #'
-#' @param use an object of the class PSTR, created by \code{\link{EstPSTR}} function.
-#' @param type a character vector specifying the types of the evaluation tests to be conducted. The value can be taken either or both of \code{"time-varying"} \code{"heterogeneity"}. By default, do both.
-#' @param vq a vector of a new transition variable for the no remaining nonlinearity test.
-#' @param iB specify the number of repetitions in the bootstrap procedure. By default, it is 100.
-#' @param parallel a boolean value showing if the parallel computation is applied.
-#' @param cpus number of cores used in the parallel computation. The value will be ignored if \code{parallel=F}.
+#' The bootstrap variants are computationally intensive. WB is robust to heteroskedasticity,
+#' while WCB is additionally robust to within-individual dependence (cluster dependence).
+#' Parallel execution can be enabled via \code{parallel} and \code{cpus}.
 #'
-#' @return a new object of the class PSTR containing the results from the evaluation tests.
+#' @param use An object of class \code{"PSTR"} returned by \code{\link{EstPSTR}}.
+#'   The model must be estimated (nonlinear PSTR) before evaluation tests can be run.
+#' @param type Character vector. Which evaluation tests to run in \code{EvalTest}.
+#'   Must be a subset of \code{c("time-varying","heterogeneity")}. Default is both.
+#' @param vq Numeric vector. Candidate transition variable used by the no remaining nonlinearity
+#'   test. Required if \code{"heterogeneity"} is included in \code{type}, and required for
+#'   \code{WCB_HETest}.
+#' @param iB Integer. Number of bootstrap replications. Default is \code{100}.
+#' @param parallel Logical. Whether to use parallel computation (via the \pkg{snowfall} backend).
+#' @param cpus Integer. Number of CPU cores used if \code{parallel = TRUE}.
 #'
-#' The return object from \code{EvalTest} contains the following new components:
-#' \item{tv}{a list of the time-varying evaluation tests. The length of the list is the maximal number of switches. Each element of the list corresponds to the time-varying evaluation test results based on different number of switches.}
-#' \item{ht}{a list of the no remaining nonlinearity (no remaining heterogeneity) evaluation tests. The length of the list is the maximal number of switches. Each element of the list corresponds to the time-varying evaluation test results based on different number of switches. The input vector of a new transition variable is used to compute the tests.}
+#' @return Invisibly returns \code{use} with evaluation results added.
+#' \describe{
+#'   \item{\code{tv}}{A list of parameter-constancy (time-varying) test results, one element per \eqn{m}.}
+#'   \item{\code{ht}}{A list of no remaining nonlinearity (heterogeneity) test results, one element per \eqn{m}.}
+#'   \item{\code{wcb_tv}}{A numeric matrix of WB/WCB p-values for parameter-constancy tests (one row per \eqn{m}).}
+#'   \item{\code{wcb_ht}}{A numeric matrix of WB/WCB p-values for no remaining nonlinearity tests (one row per \eqn{m}).}
+#' }
+#' The individual list elements in \code{tv} and \code{ht} contain LM-type test statistics and
+#' p-values (including HAC variants), consistent with the output from \code{\link{LinTest}}.
 #'
-#' The return object from \code{WCB_TVTest} contains the following new component:
-#' \item{wcb_tv}{a matrix containing the results from the WB and WCB time-varying tests. Each row of the matrix contains the p-value of the WB and WCB tests.}
-#'
-#' The return object from \code{WCB_HETest} contains the following new component:
-#' \item{wcb_ht}{a matrix containing the results from the WB and WCB no remaining nonlinearity (heterogeneity) tests. Each row of the matrix contains the p-value of the WB and WCB tests.}
-#'
-#' @author Yukai Yang, \email{yukai.yang@@statistik.uu.se}
-#' @seealso \code{\link{NewPSTR}}, \code{\link{LinTest}}, \code{\link{WCB_LinTest}} and \code{\link{EstPSTR}}
-#' @keywords evaluation
+#' @seealso \code{\link{NewPSTR}}, \code{\link{LinTest}}, \code{\link{WCB_LinTest}},
+#'   \code{\link{EstPSTR}}.
 #'
 #' @examples
 #' \donttest{
-#' pstr = NewPSTR(Hansen99, dep='inva', indep=4:20, indep_k=c('vala','debta','cfa','sales'),
-#'     tvars=c('vala'), iT=14) # create a new PSTR object
+#' pstr <- NewPSTR(Hansen99, dep = "inva", indep = 4:20,
+#'                indep_k = c("vala","debta","cfa","sales"),
+#'                tvars = c("vala"), iT = 14)
 #'
-#' # Estimate the model first
-#' pstr = EstPSTR(use=pstr, im=1, iq=1, useDelta=TRUE, par=c(.63,0), method='CG')
+#' # estimate first
+#' pstr <- EstPSTR(use = pstr, im = 1, iq = 1, useDelta = TRUE, par = c(.63, 0), method = "CG")
 #'
-#' # Then you can evaluate the model
-#' pstr = EvalTest(use=pstr, vq=pstr$mQ[,1])
+#' # evaluation tests
+#' pstr <- EvalTest(
+#'   use = pstr,
+#'   type = c("time-varying","heterogeneity"),
+#'   vq = as.matrix(Hansen99[,'vala'])[,1]
+#' )
+#' print(pstr, mode = "evaluation")
 #'
-#' print(pstr, "eval")
-#'
-#' # You can do the wild bootstrap and wild cluster bootstrap
-#'
+#' # bootstrap variants (requires snowfall)
 #' library(snowfall)
-#'
-#' pstr = WCB_TVTest(use=pstr, iB=4, parallel=TRUE, cpus=2)
-#'
-#' # pstr$mQ[,1] is the transition variable stored in the object
-#' # You can also try other transition variables.
-#' pstr = WCB_HETest(use=pstr, vq=pstr$mQ[,1], iB=4, parallel=TRUE, cpus=2)
-#'
-#' print(pstr, "eval")
-#'
-#' # Don't forget to change the values of iB and cpus during experiments.
+#' pstr <- WCB_TVTest(
+#'     use = pstr, iB = 4,
+#'     parallel = TRUE, cpus = 2)
+#' pstr <- WCB_HETest(
+#'     use = pstr,
+#'     vq = as.matrix(Hansen99[,'vala'])[,1],
+#'     iB = 4, parallel = TRUE, cpus = 2)
+#' print(pstr, mode = "evaluation")
 #' }
 #'
 #' @name EvalTest
 NULL
 
 
-
-#' @rdname EvalTest
-#' @export
-EvalTest <- function(use, type=c("time-varying","heterogeneity"), vq=NULL)
-{
-  if(class(use)!="PSTR")
-    stop(simpleError("The argument 'use' is not an object of class 'PSTR'"))
-  if(is.null(use$iq))
+PSTR$set("public", "EvalTest", function(type = c("time-varying", "heterogeneity"), vq = NULL) {
+  
+  type <- match.arg(type, several.ok = TRUE)
+  
+  if (is.null(private$iq)) {
     stop(simpleError("Estimate the PSTR model first!"))
-  ret = use
-  im = use$im
+  }
   
-  mD = diag(1,use$iN) %x% rep(1,use$iT)
-  mM = diag(1, use$iN*use$iT) - tcrossprod(mD)/use$iT
+  im = private$im
   
-  tmp = c(use$mK %*% use$beta[(ncol(use$mX)+1):length(use$beta)])
-  tmp = use$mD * tmp ## pp.14
-  mV = cbind(use$mXX, tmp)
+  mD = diag(1,private$iN) %x% rep(1,private$iT)
+  mM = diag(1, private$iN*private$iT) - tcrossprod(mD)/private$iT
+  
+  tmp = c(private$mK %*% self$beta[(ncol(private$mX)+1):length(self$beta)])
+  tmp = mD * tmp ## pp.14
+  mV = cbind(private$mXX, tmp)
   mV2 = mM %*% mV
-  invVV = chol2inv(chol(crossprod(mV2)))
+  invVV = svd_pinv(crossprod(mV2))
   
   if(length(grep("time-varying",type))>0){
-    ret$tv = list(); length(ret$tv) = im
+    self$tv = list(); length(self$tv) = im
     
-    vt = 1:use$iT/use$iT
+    vt = 1:private$iT/private$iT
     
     mW = NULL
     for(mter in 1:im){
-      mW = cbind(mW, use$mXX*(vt**mter))
-      ret$tv[[mter]] = LMTEST(iT=use$iT,iN=use$iN,vU=use$vU,mX=mV,mW=mW,mM=mM,s2=use$s2,mX2=mV2,invXX=invVV)
+      mW = cbind(mW, private$mXX*(vt**mter))
+      self$tv[[mter]] = LMTEST(iT=private$iT,iN=private$iN,vU=self$vU,mX=mV,
+                              mW=mW,mM=mM,s2=self$s2,mX2=mV2,invXX=invVV)
     }
   }
   
   if(length(grep("heterogeneity",type))>0){
-    ret$ht = list(); length(ret$ht) = im
+    self$ht = list(); length(self$ht) = im
     
     mW = NULL
     for(mter in 1:im){
-      mW = cbind(mW, use$mXX*(vq**mter))
-      ret$ht[[mter]] = LMTEST(iT=use$iT,iN=use$iN,vU=use$vU,mX=mV,mW=mW,mM=mM,s2=use$s2,mX2=mV2,invXX=invVV)
+      mW = cbind(mW, private$mXX*(vq**mter))
+      self$ht[[mter]] = LMTEST(iT=private$iT,iN=private$iN,vU=self$vU,mX=mV,
+                              mW=mW,mM=mM,s2=self$s2,mX2=mV2,invXX=invVV)
     }
   }
   
-  return(ret)
+  cli::cli_alert_success("Done!")
+  invisible(self)
+})
+
+
+#' @rdname EvalTest
+#' @export
+EvalTest <- function(use, type = c("time-varying", "heterogeneity"), vq = NULL) {
+  if (!inherits(use, "PSTR")) {
+    stop(simpleError("The argument 'use' is not an object of class 'PSTR'"))
+  }
+  use$EvalTest(type = type, vq = vq)
+  invisible(use)
 }
+
+PSTR$set("public", ".set_vY", function(vY_new) {
+  private$vY <- as.numeric(vY_new)
+  invisible(self)
+})
+
+
+PSTR$set("public", ".get_mK", function() { private$mK })
+PSTR$set("public", ".get_mX", function() { private$mX })
+PSTR$set("public", ".get_mXX", function() { private$mXX })
+
+
+PSTR$set("public", "WCB_TVTest", function(iB = 100, parallel = FALSE, cpus = 4) {
+  
+  if (is.null(private$iq)) {
+    stop(simpleError("Estimate the PSTR model first!"))
+  }
+  
+  # snowfall is only needed when parallel = TRUE
+  if (parallel) {
+    if (!requireNamespace("snowfall", quietly = TRUE)) {
+      stop(
+        "Parallel bootstrap requires the 'snowfall' package. ",
+        "Please install it via install.packages('snowfall').",
+        call. = FALSE
+      )
+    }
+  }
+  
+  # helper: run bootstrap either in parallel (snowfall) or serial (base sapply)
+  .run_boot <- function(FUN) {
+    if (parallel) {
+      snowfall::sfInit(parallel = TRUE, cpus = cpus)
+      on.exit(snowfall::sfStop(), add = TRUE)
+      snowfall::sfSapply(1:iB, FUN)
+    } else {
+      sapply(1:iB, FUN)
+    }
+  }
+  
+  # IMPORTANT: use a deep clone so we don't overwrite the original object
+  ruse <- self$clone(deep = TRUE)
+  
+  im <- private$im
+  iT <- private$iT
+  iN <- private$iN
+  
+  vU <- self$vU
+  eY <- private$vY - vU
+  
+  mD <- diag(1, iN) %x% rep(1, iT)
+  mM <- diag(1, iN * iT) - tcrossprod(mD) / iT
+  
+  tmp <- c(private$mK %*% self$beta[(ncol(private$mX) + 1):length(self$beta)])
+  tmp <- mD * tmp
+  mV <- cbind(private$mXX, tmp)
+  mV2 <- mM %*% mV
+  invVV <- svd_pinv(crossprod(mV2))
+  
+  ftmp_wb <- function(bter) { # WB
+    ve1 <- sample(c(1, -1), iT * iN, replace = TRUE) * vU
+    ruse$.set_vY(eY + ve1)
+    
+    EST <- EstPSTR(
+      use = ruse, im = 1, iq = ruse$iq,
+      par = c(self$delta, self$c),
+      useDelta = TRUE, vLower = 1, vUpper = 1
+    )
+    vu1 <- EST$vU
+    ss1 <- EST$s2
+    
+    mK <- EST$.get_mK()
+    beta <- EST$beta
+    beta_k <- tail(beta, ncol(mK))
+    tmp1 <- c(mK %*% beta_k)
+    
+    tmp1 <- mD * tmp1
+    mV11 <- cbind(EST$.get_mXX(), tmp1)
+    mV12 <- mM %*% mV11
+    invVV1 <- svd_pinv(crossprod(mV12))
+    
+    sLMTEST(iT = iT, iN = iN, vU = vu1, mX = mV11, mW = mW, mM = mM,
+            s2 = ss1, mX2 = mV12, invXX = invVV1)
+  }
+  
+  ftmp_wcb <- function(bter) { # WCB
+    ve2 <- c(t(matrix(sample(c(1, -1), iN, replace = TRUE), iN, iT))) * vU
+    ruse$.set_vY(eY + ve2)
+    
+    EST <- EstPSTR(
+      use = ruse, im = 1, iq = ruse$iq,
+      par = c(self$delta, self$c),
+      useDelta = TRUE, vLower = 1, vUpper = 1
+    )
+    vu2 <- EST$vU
+    ss2 <- EST$s2
+    
+    mK <- EST$.get_mK()
+    beta <- EST$beta
+    beta_k <- tail(beta, ncol(mK))
+    tmp2 <- c(mK %*% beta_k)
+    
+    tmp2 <- mD * tmp2
+    mV21 <- cbind(EST$.get_mXX(), tmp2)
+    mV22 <- mM %*% mV21
+    invVV2 <- svd_pinv(crossprod(mV22))
+    
+    sLMTEST(iT = iT, iN = iN, vU = vu2, mX = mV21, mW = mW, mM = mM,
+            s2 = ss2, mX2 = mV22, invXX = invVV2)
+  }
+  
+  self$wcb_tv <- NULL
+  vt <- 1:iT / iT
+  mW <- NULL
+  
+  for (mter in 1:im) {
+    
+    mW <- cbind(mW, private$mXX * (vt^mter))
+    LM <- sLMTEST(iT = iT, iN = iN, vU = vU, mX = mV, mW = mW, mM = mM,
+                  s2 = self$s2, mX2 = mV2, invXX = invVV)
+    
+    qLM1 <- .run_boot(ftmp_wb)
+    qLM2 <- .run_boot(ftmp_wcb)
+    
+    self$wcb_tv <- rbind(self$wcb_tv, c(LM, mean(LM <= qLM1), mean(LM <= qLM2)))
+  }
+  
+  self$wcb_tv <- matrix(self$wcb_tv, nrow = im)
+  
+  cli::cli_alert_success("Done!")
+  invisible(self)
+})
 
 
 
 #' @rdname EvalTest
 #' @export
-WCB_TVTest <- function(use, iB=100, parallel=F, cpus=4)
-{
-  if(class(use)!="PSTR")
+WCB_TVTest <- function(use, iB = 100, parallel = FALSE, cpus = 4) {
+  if (!inherits(use, "PSTR")) {
     stop(simpleError("The argument 'use' is not an object of class 'PSTR'"))
-  if(is.null(use$iq))
-    stop(simpleError("Estimate the PSTR model first!"))
-  ret = use; ruse = use
-  im = use$im
-  
-  iT = use$iT; iN = use$iN
-  vU = use$vU; eY = use$vY - vU
-  
-  mD = diag(1,iN) %x% rep(1,iT)
-  mM = diag(1, iN*iT) - tcrossprod(mD)/iT
-  
-  tmp = c(use$mK %*% use$beta[(ncol(use$mX)+1):length(use$beta)])
-  tmp = use$mD * tmp
-  mV = cbind(use$mXX, tmp)
-  mV2 = mM %*% mV
-  invVV = chol2inv(chol(crossprod(mV2)))
-  
-  ftmp_wb <- function(bter){# WB
-    ve1 = sample(c(1,-1),iT*iN,replace=T)*vU
-    ruse$vY = eY + ve1
-    EST = EstPSTR(use=ruse,im=1,iq=ruse$iq,par=c(use$delta,use$c),useDelta=T,vLower=1,vUpper=1)
-    vu1 = EST$vU; ss1 = EST$s2 # sigma^2
-    tmp = c(EST$mK%*%EST$beta[(ncol(EST$mX)+1):length(EST$beta)])
-    tmp = EST$mD * tmp
-    mV11 = cbind(EST$mXX, tmp)
-    mV12 = mM %*% mV11
-    invVV1 = chol2inv(chol(t(mV12)%*%mV12))
-    return(sLMTEST(iT=iT,iN=iN,vU=vu1,mX=mV11,mW=mW,mM=mM,s2=ss1,mX2=mV12,invXX=invVV1))
   }
-  
-  ftmp_wcb <- function(bter){# WCB
-    ve2 = c(t(matrix(sample(c(1,-1),iN,replace=T),iN,iT)))*vU
-    ruse$vY = eY + ve2
-    EST = EstPSTR(use=ruse,im=1,iq=ruse$iq,par=c(use$delta,use$c),useDelta=T,vLower=1,vUpper=1)
-    vu2 = EST$vU; ss2 = EST$s2 # sigma^2
-    tmp = c(EST$mK%*%EST$beta[(ncol(EST$mX)+1):length(EST$beta)])
-    tmp = EST$mD * tmp
-    mV21 = cbind(EST$mXX, tmp)
-    mV22 = mM %*% mV21
-    invVV2 = chol2inv(chol(t(mV22)%*%mV22))
-    return(sLMTEST(iT=iT,iN=iN,vU=vu2,mX=mV21,mW=mW,mM=mM,s2=ss2,mX2=mV22,invXX=invVV2))
-  }
-  
-  ret$wcb_tv = NULL
-  vt = 1:iT/iT
-  mW = NULL
-  
-  for(mter in 1:im){
-    mW = cbind(mW, use$mXX*(vt**mter))
-    LM = sLMTEST(iT=iT,iN=iN,vU=vU,mX=mV,mW=mW,mM=mM,s2=use$s2,mX2=mV2,invXX=invVV)
-    
-    sfInit(parallel=parallel,cpus=cpus)
-    qLM1 = sfSapply(1:iB,ftmp_wb)
-    qLM2 = sfSapply(1:iB,ftmp_wcb)
-    sfStop()
-    
-    ret$wcb_tv = rbind(ret$wcb_tv,c(LM, mean(LM<=qLM1), mean(LM<=qLM2)))
-  }
-  
-  ret$wcb_tv = matrix(ret$wcb_tv, nrow=im)
-  
-  return(ret)
+  use$WCB_TVTest(iB = iB, parallel = parallel, cpus = cpus)
+  invisible(use)
 }
 
+
+PSTR$set("public", "WCB_HETest", function(vq, iB = 100, parallel = FALSE, cpus = 4) {
+  
+  if (is.null(private$iq)) {
+    stop(simpleError("Estimate the PSTR model first!"))
+  }
+  
+  if (is.null(vq)) {
+    stop(simpleError("Please provide 'vq' for the heterogeneity test."))
+  }
+  
+  # snowfall is only needed when parallel = TRUE
+  if (parallel) {
+    if (!requireNamespace("snowfall", quietly = TRUE)) {
+      stop(
+        "Parallel bootstrap requires the 'snowfall' package. ",
+        "Please install it via install.packages('snowfall').",
+        call. = FALSE
+      )
+    }
+  }
+  
+  # helper: run bootstrap either in parallel (snowfall) or serial (base sapply)
+  .run_boot <- function(FUN) {
+    if (parallel) {
+      snowfall::sfInit(parallel = TRUE, cpus = cpus)
+      on.exit(snowfall::sfStop(), add = TRUE)
+      snowfall::sfSapply(1:iB, FUN)
+    } else {
+      sapply(1:iB, FUN)
+    }
+  }
+  
+  # IMPORTANT: use a deep clone so we don't overwrite the original object
+  ruse <- self$clone(deep = TRUE)
+  
+  im <- private$im
+  iT <- private$iT
+  iN <- private$iN
+  
+  vU <- self$vU
+  eY <- private$vY - vU
+  
+  mD <- diag(1, iN) %x% rep(1, iT)
+  mM <- diag(1, iN * iT) - tcrossprod(mD) / iT
+  
+  # build V for the auxiliary regression (pp.14)
+  mK0 <- private$mK
+  beta0 <- self$beta
+  beta_k0 <- tail(beta0, ncol(mK0))
+  tmp <- c(mK0 %*% beta_k0)
+  
+  tmp <- mD * tmp
+  mV <- cbind(private$mXX, tmp)
+  mV2 <- mM %*% mV
+  invVV <- svd_pinv(crossprod(mV2))
+  
+  ftmp_wb <- function(bter) { # WB
+    ve1 <- sample(c(1, -1), iT * iN, replace = TRUE) * vU
+    ruse$.set_vY(eY + ve1)
+    
+    EST <- EstPSTR(
+      use = ruse, im = 1, iq = ruse$iq,
+      par = c(self$delta, self$c),
+      useDelta = TRUE, vLower = 1, vUpper = 1
+    )
+    
+    vu1 <- EST$vU
+    ss1 <- EST$s2
+    
+    mK <- EST$.get_mK()
+    beta <- EST$beta
+    beta_k <- tail(beta, ncol(mK))
+    tmp1 <- c(mK %*% beta_k)
+    
+    tmp1 <- mD * tmp1
+    mV11 <- cbind(EST$.get_mXX(), tmp1)
+    mV12 <- mM %*% mV11
+    invVV1 <- svd_pinv(crossprod(mV12))
+    
+    sLMTEST(
+      iT = iT, iN = iN, vU = vu1,
+      mX = mV11, mW = mW, mM = mM,
+      s2 = ss1, mX2 = mV12, invXX = invVV1
+    )
+  }
+  
+  ftmp_wcb <- function(bter) { # WCB
+    ve2 <- c(t(matrix(sample(c(1, -1), iN, replace = TRUE), iN, iT))) * vU
+    ruse$.set_vY(eY + ve2)
+    
+    EST <- EstPSTR(
+      use = ruse, im = 1, iq = ruse$iq,
+      par = c(self$delta, self$c),
+      useDelta = TRUE, vLower = 1, vUpper = 1
+    )
+    
+    vu2 <- EST$vU
+    ss2 <- EST$s2
+    
+    mK <- EST$.get_mK()
+    beta <- EST$beta
+    beta_k <- tail(beta, ncol(mK))
+    tmp2 <- c(mK %*% beta_k)
+    
+    tmp2 <- mD * tmp2
+    mV21 <- cbind(EST$.get_mXX(), tmp2)
+    mV22 <- mM %*% mV21
+    invVV2 <- svd_pinv(crossprod(mV22))
+    
+    sLMTEST(
+      iT = iT, iN = iN, vU = vu2,
+      mX = mV21, mW = mW, mM = mM,
+      s2 = ss2, mX2 = mV22, invXX = invVV2
+    )
+  }
+  
+  self$wcb_ht <- NULL
+  mW <- NULL
+  
+  for (mter in 1:im) {
+    
+    mW <- cbind(mW, private$mXX * (vq ^ mter))
+    
+    LM <- sLMTEST(
+      iT = iT, iN = iN, vU = vU,
+      mX = mV, mW = mW, mM = mM,
+      s2 = self$s2, mX2 = mV2, invXX = invVV
+    )
+    
+    qLM1 <- .run_boot(ftmp_wb)
+    qLM2 <- .run_boot(ftmp_wcb)
+    
+    self$wcb_ht <- rbind(self$wcb_ht, c(LM, mean(LM <= qLM1), mean(LM <= qLM2)))
+  }
+  
+  self$wcb_ht <- matrix(self$wcb_ht, nrow = im)
+  
+  cli::cli_alert_success("Done!")
+  invisible(self)
+})
 
 
 #' @rdname EvalTest
 #' @export
-WCB_HETest <- function(use, vq, iB=100, parallel=F, cpus=4)
-{
-  if(class(use)!="PSTR")
+WCB_HETest <- function(use, vq, iB = 100, parallel = FALSE, cpus = 4) {
+  if (!inherits(use, "PSTR")) {
     stop(simpleError("The argument 'use' is not an object of class 'PSTR'"))
-  if(is.null(use$iq))
-    stop(simpleError("Estimate the PSTR model first!"))
-  ret = use; ruse = use
-  im = use$im
-  
-  iT = use$iT; iN = use$iN
-  vU = use$vU; eY = use$vY - vU
-  
-  mD = diag(1,iN) %x% rep(1,iT)
-  mM = diag(1, iN*iT) - tcrossprod(mD)/iT
-  
-  tmp = c(use$mK %*% use$beta[(ncol(use$mX)+1):length(use$beta)])
-  tmp = use$mD * tmp
-  mV = cbind(use$mXX, tmp)
-  mV2 = mM %*% mV
-  invVV = chol2inv(chol(crossprod(mV2)))
-  
-  ftmp_wb <- function(bter){# WB
-    ve1 = sample(c(1,-1),iT*iN,replace=T)*vU
-    ruse$vY = eY + ve1
-    EST = EstPSTR(use=ruse,im=1,iq=ruse$iq,par=c(use$delta,use$c),useDelta=T,vLower=1,vUpper=1)
-    vu1 = EST$vU; ss1 = EST$s2 # sigma^2
-    tmp = c(EST$mK%*%EST$beta[(ncol(EST$mX)+1):length(EST$beta)])
-    tmp = EST$mD * tmp
-    mV11 = cbind(EST$mXX, tmp)
-    mV12 = mM %*% mV11
-    invVV1 = chol2inv(chol(t(mV12)%*%mV12))
-    return(sLMTEST(iT=iT,iN=iN,vU=vu1,mX=mV11,mW=mW,mM=mM,s2=ss1,mX2=mV12,invXX=invVV1))
   }
-  
-  ftmp_wcb <- function(bter){# WCB
-    ve2 = c(t(matrix(sample(c(1,-1),iN,replace=T),iN,iT)))*vU
-    ruse$vY = eY + ve2
-    EST = EstPSTR(use=ruse,im=1,iq=ruse$iq,par=c(use$delta,use$c),useDelta=T,vLower=1,vUpper=1)
-    vu2 = EST$vU; ss2 = EST$s2 # sigma^2
-    tmp = c(EST$mK%*%EST$beta[(ncol(EST$mX)+1):length(EST$beta)])
-    tmp = EST$mD * tmp
-    mV21 = cbind(EST$mXX, tmp)
-    mV22 = mM %*% mV21
-    invVV2 = chol2inv(chol(t(mV22)%*%mV22))
-    return(sLMTEST(iT=iT,iN=iN,vU=vu2,mX=mV21,mW=mW,mM=mM,s2=ss2,mX2=mV22,invXX=invVV2))
-  }
-  
-  ret$wcb_ht = NULL
-  mW = NULL
-  
-  for(mter in 1:im){
-    mW = cbind(mW, use$mXX*(vq**mter))
-    LM = sLMTEST(iT=iT,iN=iN,vU=vU,mX=mV,mW=mW,mM=mM,s2=use$s2,mX2=mV2,invXX=invVV)
-    
-    sfInit(parallel=parallel,cpus=cpus)
-    qLM1 = sfSapply(1:iB,ftmp_wb)
-    qLM2 = sfSapply(1:iB,ftmp_wcb)
-    sfStop()
-    
-    ret$wcb_ht = rbind(ret$wcb_ht,c(LM, mean(LM<=qLM1), mean(LM<=qLM2)))
-  }
-  
-  ret$wcb_ht = matrix(ret$wcb_ht, nrow=im)
-  
-  return(ret)
+  use$WCB_HETest(vq = vq, iB = iB, parallel = parallel, cpus = cpus)
+  invisible(use)
 }
